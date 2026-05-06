@@ -61,7 +61,7 @@ _ef_query = GeminiEmbeddingFunction(gemini_client, task_type="RETRIEVAL_QUERY") 
 class RAGHandler:
 
     def __init__(self):
-        self.client = chromadb.Client()
+        self.client = chromadb.PersistentClient(path="./chroma_db")
 
         # Collection uses the document embedding function for all .add() calls.
         self.collection = self.client.get_or_create_collection(

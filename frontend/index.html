@@ -2691,7 +2691,9 @@
            STATE
         ══════════════════════════════════════════════════════ */
         const S = { qs: 0, docs: [], topics: {}, recents: [], ragOn: true, busy: false, start: Date.now() };
-        const API = 'http://localhost:8000';
+        const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000'
+            : window.location.origin;
 
         /* ══════════════════════════════════════════════════════
            INIT
