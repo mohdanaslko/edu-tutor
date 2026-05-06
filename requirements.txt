@@ -1,12 +1,25 @@
-langchain==1.2.16
-langchain-community==0.4.1
-streamlit==1.57.0
-chromadb==1.5.8
-sentence-transformers==5.4.1
-pypdf==6.10.2
-python-docx==1.2.0
+# Core API
 fastapi==0.136.1
-uvicorn==0.46.0
+uvicorn[standard]==0.34.3
 python-dotenv==1.2.2
 pydantic==2.13.3
-langchain-ollama==0.6.2
+
+# LLM — Groq (free tier, no quota issues)
+langchain==1.2.16
+langchain-community==0.4.1
+langchain-groq==1.1.2
+
+# RAG
+chromadb==1.5.8
+sentence-transformers==5.4.1
+
+# Document loaders
+pypdf==6.10.2
+python-docx==1.2.0
+docx2txt==0.8
+
+# Image processing (for RAG image uploads via Gemini Vision — optional)
+Pillow==11.2.1
+google-genai==1.75.0
+
+edge-tts==7.2.8
