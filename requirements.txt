@@ -3,8 +3,9 @@ fastapi==0.136.1
 uvicorn[standard]==0.34.3
 python-dotenv==1.2.2
 pydantic==2.13.3
+python-multipart==0.0.20
 
-# LLM — Groq (free tier)
+# LLM — Groq
 langchain==1.2.16
 langchain-community==0.4.1
 langchain-groq==1.1.2

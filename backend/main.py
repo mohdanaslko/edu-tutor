@@ -1,20 +1,32 @@
 import os
 import tempfile
 import traceback
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import uvicorn
 import edge_tts
 from fastapi.responses import StreamingResponse
 from backend.llm_handler import LLMHandler
 from backend.rag_handler import RAGHandler, IMAGE_EXTENSIONS, DOC_EXTENSIONS
 
-app = FastAPI(title="EduTutor API", version="5.0.0")
+# ── Globals populated during lifespan startup, NOT at import time ─────────────
+llm: LLMHandler = None
+rag: RAGHandler = None
 
-# ── CORS — allow all origins so any cloud frontend domain works ───────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Runs AFTER the server binds its port — safe place for heavy init."""
+    global llm, rag
+    llm = LLMHandler()
+    rag = RAGHandler()
+    yield
+
+app = FastAPI(title="EduTutor API", version="5.0.0", lifespan=lifespan)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,17 +38,13 @@ app.add_middleware(
 # ── Static files ──────────────────────────────────────────────────────────────
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
-IMAGES_DIR = os.path.join(FRONTEND_DIR, "images")
+IMAGES_DIR   = os.path.join(FRONTEND_DIR, "images")
 os.makedirs(FRONTEND_DIR, exist_ok=True)
 
-# Only mount /static if the directory exists and has files
 if os.path.isdir(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 if os.path.isdir(IMAGES_DIR):
     app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
-
-llm = LLMHandler()
-rag = RAGHandler()
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -64,13 +72,14 @@ class TTSRequest(BaseModel):
     text: str
     language: str
 
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_homepage():
     html_path = os.path.join(FRONTEND_DIR, "index.html")
     if not os.path.exists(html_path):
-        return HTMLResponse("<h2>EduTutor API is running. Frontend not found at expected path.</h2>", status_code=200)
+        return HTMLResponse("<h2>EduTutor API is running. Frontend not found.</h2>", status_code=200)
     with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
@@ -83,7 +92,7 @@ def health_check():
         "models": {
             "chat":    "llama-3.3-70b-versatile (Groq)",
             "lessons": "llama-3.3-70b-versatile (Groq)",
-            "tts":     "Browser speechSynthesis (free, no API)"
+            "tts":     "edge-tts (server-side)"
         }
     }
 
@@ -127,35 +136,30 @@ async def upload_document(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/tts")
 async def generate_speech(req: TTSRequest):
-    # Map your frontend languages to premium Azure Neural voices
     voice_map = {
-        "English": "en-US-AriaNeural",      # Warm, highly expressive American female
-        "Hindi": "hi-IN-SwaraNeural",       # Natural Hindi female
-        "Hinglish": "hi-IN-SwaraNeural",    # Uses Hindi voice for mixed text
-        "Urdu": "ur-PK-UzmaNeural",
-        "Persian": "fa-IR-DilaraNeural",
-        "German": "de-DE-AmalaNeural",
-        "French": "fr-FR-DeniseNeural"
+        "English":  "en-US-AriaNeural",
+        "Hindi":    "hi-IN-SwaraNeural",
+        "Hinglish": "hi-IN-SwaraNeural",
+        "Urdu":     "ur-PK-UzmaNeural",
+        "Persian":  "fa-IR-DilaraNeural",
+        "German":   "de-DE-AmalaNeural",
+        "French":   "fr-FR-DeniseNeural"
     }
-    
-    # Fallback to Aria if language isn't found
     voice = voice_map.get(req.language, "en-US-AriaNeural")
-    
     try:
         communicate = edge_tts.Communicate(req.text, voice)
-        
         async def audio_stream():
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
                     yield chunk["data"]
-                    
         return StreamingResponse(audio_stream(), media_type="audio/mpeg")
-    
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/tutor/start")
 async def tutor_start(req: TutorStartRequest):
@@ -184,12 +188,6 @@ async def tutor_followup(req: TutorFollowupRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-    
 @app.get("/api/documents")
 def get_documents():
     return {"documents": rag.get_document_list()}
-
-
-#if __name__ == "__main__":
-   # port = int(os.getenv("PORT", 8000))
-    #uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
