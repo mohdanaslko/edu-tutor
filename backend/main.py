@@ -9,8 +9,8 @@ from pydantic import BaseModel
 import uvicorn
 import edge_tts
 from fastapi.responses import StreamingResponse
-from llm_handler import LLMHandler
-from rag_handler import RAGHandler, IMAGE_EXTENSIONS, DOC_EXTENSIONS
+from backend.llm_handler import LLMHandler
+from backend.rag_handler import RAGHandler, IMAGE_EXTENSIONS, DOC_EXTENSIONS
 
 app = FastAPI(title="EduTutor API", version="5.0.0")
 

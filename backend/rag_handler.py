@@ -15,7 +15,7 @@ GEMINI_API       = os.getenv("GEMINI_API")
 GEMINI_MODEL     = "gemini-2.0-flash"
 EMBEDDING_MODEL  = "gemini-embedding-001"          # Gemini's best embedding model (free tier)
 
-gemini_client = genai.Client(api_key=GEMINI_API)
+gemini_client = genai.Client(api_key=GEMINI_API) if GEMINI_API else None
 
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
 DOC_EXTENSIONS   = {'.pdf', '.docx', '.doc', '.txt'}
@@ -54,8 +54,8 @@ class GeminiEmbeddingFunction:
 # ChromaDB stores a single embedding function per collection, so we swap the
 # task_type at query time by using a separate function object for queries.
 
-_ef_index = GeminiEmbeddingFunction(gemini_client, task_type="RETRIEVAL_DOCUMENT")
-_ef_query = GeminiEmbeddingFunction(gemini_client, task_type="RETRIEVAL_QUERY")
+_ef_index = GeminiEmbeddingFunction(gemini_client, task_type="RETRIEVAL_DOCUMENT") if gemini_client else None
+_ef_query = GeminiEmbeddingFunction(gemini_client, task_type="RETRIEVAL_QUERY") if gemini_client else None
 
 
 class RAGHandler:

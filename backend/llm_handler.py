@@ -6,8 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API = os.getenv("Groq_API")
-if not GROQ_API:
-    raise EnvironmentError("Groq_API key is missing from .env")
 
 LANG_INSTRUCTIONS = {
     "English":  "Clear, simple, warm English. Like a friendly patient teacher. Short sentences.",
@@ -23,6 +21,8 @@ LANG_INSTRUCTIONS = {
 class LLMHandler:
 
     def __init__(self):
+        if not GROQ_API:
+            raise EnvironmentError("Groq_API key is missing. Set it as an environment variable in Render.")
         self.llm = ChatGroq(
             model="llama-3.3-70b-versatile",
             api_key=GROQ_API,

@@ -8,6 +8,7 @@ pydantic==2.13.3
 langchain==1.2.16
 langchain-community==0.4.1
 langchain-groq==1.1.2
+langchain-text-splitters==0.3.8
 
 # RAG
 chromadb==1.5.8
