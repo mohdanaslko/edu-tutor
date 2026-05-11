@@ -1637,11 +1637,54 @@
             if (!topic) { toast('Please enter a topic to learn', 'err'); return; }
             const lang = getSelectedLang();
             const btn = document.getElementById('btn-start');
-            btn.disabled = true; btn.innerHTML = '<span style="opacity:0.7">Generating lesson…</span>';
+            btn.disabled = true;
+            btn.innerHTML = '<span style="opacity:0.7">Generating lesson…</span>';
+
+            // Animate the orb immediately so the user knows something is happening
+            setOrbState('loading');
+
             try {
-                const res = await fetch(`${API}/api/tutor/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic, language: lang }) });
+                // ── SSE fetch — keeps the Render connection alive during generation ──
+                const res = await fetch(`${API}/api/tutor/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, language: lang })
+                });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                const lesson = await res.json();
+
+                const reader  = res.body.getReader();
+                const decoder = new TextDecoder();
+                let   buffer  = '';
+                let   lesson  = null;
+
+                outer: while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // SSE frames are separated by "\n\n"
+                    const frames = buffer.split('\n\n');
+                    buffer = frames.pop(); // keep incomplete trailing frame
+
+                    for (const frame of frames) {
+                        if (!frame.startsWith('data: ')) continue;
+                        let evt;
+                        try { evt = JSON.parse(frame.slice(6)); } catch { continue; }
+
+                        if (evt.status === 'generating') {
+                            // Keep-alive ping — orb is already loading, nothing to do
+                        } else if (evt.status === 'done') {
+                            lesson = evt.lesson;
+                            break outer;
+                        } else if (evt.status === 'error') {
+                            throw new Error(evt.detail || 'Unknown server error');
+                        }
+                    }
+                }
+
+                if (!lesson) throw new Error('No lesson received from server');
+
+                // ── Lesson received — set up the player ──────────────────────
                 T.lesson = lesson; T.language = lang; T.brickIndex = 0;
                 document.getElementById('tutor-setup').style.display = 'none';
                 const player = document.getElementById('tutor-player');
@@ -1653,10 +1696,11 @@
                 document.getElementById('ptopic').textContent = lesson.topic;
                 document.getElementById('plang').textContent = lang;
                 document.getElementById('pvoice').textContent = '🔊 Azure Premium Voice';
-                setOrbState('loading');
                 updateDots(0, lesson.bricks.length);
                 setTimeout(() => T.playFromBrick(0), 400);
+
             } catch (err) {
+                setOrbState('idle');
                 toast('Lesson generation failed: ' + err.message, 'err');
             } finally {
                 btn.disabled = false;
